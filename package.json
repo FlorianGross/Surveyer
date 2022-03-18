@@ -1,0 +1,24 @@
+{
+  "name": "surveyer",
+  "version": "1.0.0",
+  "description": "��#\u0000 \u0000S\u0000u\u0000r\u0000v\u0000e\u0000y\u0000e\u0000r\u0000\r\u0000 \u0000",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FlorianGross/Surveyer.git"
+  },
+  "author": "Florian Groß",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/FlorianGross/Surveyer/issues"
+  },
+  "homepage": "https://github.com/FlorianGross/Surveyer#readme",
+  "dependencies": {
+    "express": "^4.17.3",
+    "ws": "^8.5.0"
+  }
+}
