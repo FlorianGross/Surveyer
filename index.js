@@ -1,21 +1,49 @@
-const express = require('express')
+const express = require('express');
 const app = express()
-const server = require('http').createServer(app);
 const WebSocket = require('ws');
+const cors = require('cors');
+app.use(cors);
+
+const mongoose = require("mongoose");
+
+mongoose.connect('mongodb://root:example@localhost:27018/', {useNewUrlParser: true, useUnifiedTopology: true}).then(()=>{
+    console.log("Successfully connected to MongoDB")}).catch(err=>console.log("Error connecting to DB: " + err));
+
+const server = require('http').createServer(app);
 
 const wss = new WebSocket.Server({server:server});
 
+wss.on('connection', (ws) => {
+    console.log("New Client Connected");
+    ws.on('message', (message) => {
+        console.log('received: %s', message);
+        var obj = JSON.parse(message);
+        switch(obj.Type){
+            case "startSession":{
+                var answer = {
+                    "Type": "Answer",
+                }
+                ws.send(JSON.stringify(answer))
+                break;
+            }
+            case "stopSession": {
+                activeSessions.pop(1)
+                var answer = {
+                    "Type": "Answer",
+                    "Result": "Successful"
+                }
+                break;
+            }
+            default: break;
+        }
+    }); 
+    ws.send('Successfully Connected to WS');
 
-wss.on('connection', function connection(ws){
-    console.log("New Client connected")
-    ws.send('Welcome new Client')
-    
-    ws.on('message', function incoming(message){
-        console.log('recieved: %s', message)
-        ws.send('Got your message')
-    });
-})
+    ws.on('close', ()=>{
+        console.log("Client disconnected")
+    })
+});
 
-app.get('/', (req, res) => res.send("Hello World"))
-
-server.listen(3000, ()=> console.log('Listening on Port :3000'))
+server.listen(process.env.PORT || 3000, () => {
+    console.log(`Server started on port ${server.address().port}`);
+});
