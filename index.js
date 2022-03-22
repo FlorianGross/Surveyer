@@ -5,7 +5,6 @@ const cors = require('cors');
 app.use(cors);
 
 const mongoose = require("mongoose");
-const internal = require('stream');
 const { Schema } = mongoose;
 
 const sessionSchema = new Schema({
@@ -19,11 +18,13 @@ const sessionSchema = new Schema({
     }],
     isActive: Boolean,
 });
+
 const userSchema = new Schema({
     userName: String,
     email: String,
     password: String,
 })
+
 const surveySchema = new Schema({
     surveySession: {
         type: mongoose.Schema.Types.ObjectId,
@@ -40,7 +41,6 @@ const surveySchema = new Schema({
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
 });
 
-
 mongoose.connect('mongodb://root:example@localhost:27018', { useNewUrlParser: true, useUnifiedTopology: true, dbName: "android" }).then(() => {
     console.log("Successfully connected to MongoDB")
 }).catch(err => console.log("Error connecting to DB: " + err));
@@ -56,29 +56,7 @@ wss.on('connection', async (ws) => {
     ws.on('message', async (message) => {
         console.log('received: %s', message);
         var obj = JSON.parse(message);
-        switch (obj.Type) {
-            case "registerClient": {
-                registerClient(obj, ws);
-                break;
-            }
-            case "startSession": {
-                startSession(obj, ws);
-                break;
-            }
-            case "stopSession": {
-                stopSession(obj, ws);
-                break;
-            }
-            case "startSurvey": {
-                startSurvey(obj, ws);
-                break;
-            }
-            case "stopSurvey": {
-                stopSurvey(obj, ws);
-                break;
-            }
-            default: break;
-        }
+        useJSON(obj, ws);
     });
     ws.on('close', () => {
         console.log("Client disconnected")
@@ -88,6 +66,34 @@ wss.on('connection', async (ws) => {
 server.listen(process.env.PORT || 3000, () => {
     console.log(`Server started on port ${server.address().port}`);
 });
+
+async function useJSON(obj, ws){
+    switch (obj.Type) {
+        case "registerClient": {
+            registerClient(obj, ws);
+            break;
+        }
+        case "startSession": {
+            startSession(obj, ws);
+            break;
+        }
+        case "stopSession": {
+            stopSession(obj, ws);
+            break;
+        }
+        case "startSurvey": {
+            startSurvey(obj, ws);
+            break;
+        }
+        case "stopSurvey": {
+            stopSurvey(obj, ws);
+            break;
+        }
+        default: 
+        missingType(obj, ws);
+        break;
+    }
+}
 
 async function startSession(obj, ws) {
     try {
@@ -130,9 +136,11 @@ async function stopSession(obj, ws) {
 async function startSurvey(obj, ws) {
 
 }
+
 async function stopSurvey(obj) {
 
 }
+
 async function registerClient(obj, ws) {
     try {
         var user = await User.create({});
@@ -149,4 +157,8 @@ async function registerClient(obj, ws) {
         }
     }
     ws.send(JSON.stringify(answer));
+}
+
+async function missingType(obj, ws){
+    ws.send(JSON.stringify({"Type": "Error", "Result": obj}));
 }
