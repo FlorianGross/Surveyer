@@ -2,6 +2,8 @@ const express = require('express');
 const app = express()
 const WebSocket = require('ws');
 const cors = require('cors');
+const dotenv = require('dotenv');
+dotenv.config()
 app.use(cors);
 
 const mongoose = require("mongoose");
@@ -41,7 +43,7 @@ const surveySchema = new Schema({
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
 });
 
-mongoose.connect('mongodb://root:example@localhost:27018', { useNewUrlParser: true, useUnifiedTopology: true, dbName: "android" }).then(() => {
+mongoose.connect('mongodb://'+process.env.MONGO_DB_USER+':'+process.env.MONGO_DB_PASSWORD+'@'+process.env.MONGO_DB_NAME+':'+process.env.MONGO_DB_PORT, { useNewUrlParser: true, useUnifiedTopology: true, dbName: "android" }).then(() => {
     console.log("Successfully connected to MongoDB")
 }).catch(err => console.log("Error connecting to DB: " + err));
 var Session = mongoose.model('Sessions', sessionSchema);
