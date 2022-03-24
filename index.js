@@ -38,12 +38,10 @@ const surveySchema = new Schema({
     surveyApprove: Number,
     surveyDeny: Number,
     surveyNotParicipate: Number,
-    surveyOptions: [String],
-    surveyOptionResults: [{ Number, Number, Number }],
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
 });
 
-mongoose.connect('mongodb://'+process.env.MONGO_DB_USER+':'+process.env.MONGO_DB_PASSWORD+'@'+process.env.MONGO_DB_NAME+':'+process.env.MONGO_DB_PORT, { useNewUrlParser: true, useUnifiedTopology: true, dbName: "android" }).then(() => {
+mongoose.connect(process.env.MONGO_DB_CONNECTION_STRING || 'mongodb://' + process.env.MONGO_DB_USER + ':' + process.env.MONGO_DB_PASSWORD + '@' + process.env.MONGO_DB_NAME + ':' + process.env.MONGO_DB_PORT, { useNewUrlParser: true, useUnifiedTopology: true, dbName: "android" }).then(() => {
     console.log("Successfully connected to MongoDB")
 }).catch(err => console.log("Error connecting to DB: " + err));
 var Session = mongoose.model('Sessions', sessionSchema);
@@ -53,14 +51,23 @@ var User = mongoose.model('User', userSchema);
 const server = require('http').createServer(app);
 
 const wss = new WebSocket.Server({ server: server });
+
+var CLIENTS = []
+var id;
 wss.on('connection', async (ws) => {
-    console.log("New Client Connected");
+    id = Math.random();
+    CLIENTS[id] = ws;
+    CLIENTS.push(ws);
+    console.log(CLIENTS.length)
+    console.log("New Client Connected " + id);
     ws.on('message', async (message) => {
         console.log('received: %s', message);
         var obj = JSON.parse(message);
         useJSON(obj, ws);
     });
     ws.on('close', () => {
+        CLIENTS.pop(ws)
+        console.log(CLIENTS.length)
         console.log("Client disconnected")
     })
 });
@@ -69,7 +76,7 @@ server.listen(process.env.PORT || 3000, () => {
     console.log(`Server started on port ${server.address().port}`);
 });
 
-async function useJSON(obj, ws){
+async function useJSON(obj, ws) {
     switch (obj.Type) {
         case "registerClient": {
             registerClient(obj, ws);
@@ -91,9 +98,9 @@ async function useJSON(obj, ws){
             stopSurvey(obj, ws);
             break;
         }
-        default: 
-        missingType(obj, ws);
-        break;
+        default:
+            missingType(obj, ws);
+            break;
     }
 }
 
@@ -136,7 +143,31 @@ async function stopSession(obj, ws) {
 }
 
 async function startSurvey(obj, ws) {
+    try {
+        var user = await User.findById(obj.uid);
+        var surveyTemp = await Surveys.create({
+            surveySession: await Session.findById(obj.sessionId),
+            creator: obj.uid,
+            surveyOpened: true,
+            surveyName: obj.surveyName,
+            surveyApprove: 0,
+            surveyDeny: 0,
+            surveyNotParicipate: 0,
+            participants: [user]
+        });
+        var answer = {
+            "Type": "Answer",
+            "surveyID": surveyTemp._id
+        }
 
+    } catch (e) {
+        console.log(e)
+        var answer = {
+            "Type": "Error",
+            "Result": e
+        }
+    }
+   ws.send(JSON.stringify(answer));
 }
 
 async function stopSurvey(obj) {
@@ -161,6 +192,16 @@ async function registerClient(obj, ws) {
     ws.send(JSON.stringify(answer));
 }
 
-async function missingType(obj, ws){
-    ws.send(JSON.stringify({"Type": "Error", "Result": obj}));
+async function updateSurvey(obj, ws){
+
+}
+
+async function missingType(obj, ws) {
+    ws.send(JSON.stringify({ "Type": "Error", "Result": obj }));
+}
+
+async function sendMessageToAll(ws, message, CLIENTS) {
+    for (i = 0; i < CLIENTS.lenght; i++) {
+        CLIENTS[i].send(message);
+    }
 }
