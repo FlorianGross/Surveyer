@@ -53,11 +53,9 @@ const server = require('http').createServer(app);
 const wss = new WebSocket.Server({ server: server });
 
 var CLIENTS = []
-var id;
+var id = 0;
 wss.on('connection', async (ws) => {
-    id = Math.random();
-    CLIENTS[id] = ws;
-    CLIENTS.push(ws);
+    CLIENTS.push(ws)
     console.log(CLIENTS.length)
     console.log("New Client Connected " + id);
     ws.on('message', async (message) => {
@@ -96,6 +94,26 @@ async function useJSON(obj, ws) {
         }
         case "stopSurvey": {
             stopSurvey(obj, ws);
+            break;
+        }
+        case "callRefresh":{
+            callRefresh(this.CLIENTS);
+            break;
+        }
+        case "refreshAll": {
+            refreshAll(obj, ws);
+            break;
+        }
+        case "refreshSurveyByID": {
+            refreshSurveyByID(obj, ws);
+            break;
+        }
+        case "refreshSurveyByUID": {
+            refreshSurveyByUID(obj, ws);
+            break;
+        }
+        case "refreshSession": {
+            refreshSession(obj, ws);
             break;
         }
         default:
@@ -167,14 +185,14 @@ async function startSurvey(obj, ws) {
             "Result": e
         }
     }
-   ws.send(JSON.stringify(answer));
+    ws.send(JSON.stringify(answer));
 }
 
 async function stopSurvey(obj) {
 
 }
 
-async function registerClient(obj, ws) {
+async function registerClient(ws) {
     try {
         var user = await User.create({});
         var answer = {
@@ -192,17 +210,122 @@ async function registerClient(obj, ws) {
     ws.send(JSON.stringify(answer));
 }
 
-async function updateSurvey(obj, ws){
-
-}
-
 async function missingType(obj, ws) {
     ws.send(JSON.stringify({ "Type": "Error", "Result": obj }));
 }
 
-async function sendMessageToAll(ws, message, CLIENTS) {
-    for (i = 0; i < CLIENTS.lenght; i++) {
-        CLIENTS[i].send(message);
+async function sendMessageToAll(obj) {
+    for (i = 0; i < CLIENTS.length; i++) {
+        CLIENTS[i].send(obj);
     }
 }
 
+async function callRefresh(){
+    try{
+        var answer = {
+            "Type":"Answer",
+            "Result":"callRefresh"
+        }
+        sendMessageToAll(JSON.stringify(answer));
+
+    }catch(e){
+        console.log(e);
+
+    }
+}
+
+async function refreshAll(obj, ws) {
+    refreshAllSurvey(obj, ws);
+    refreshAllSessions(obj, ws);
+}
+
+async function refreshSurveyByUID(obj, ws) {
+    try {
+        var user = await User.findById(obj.uid);
+        var surveys = await Surveys.find({ participants: user });
+        var answer = {
+            "Type": "Answer",
+            "Refresh": "SurveyByUID",
+            "Result": surveys
+        }
+    } catch (e) {
+        console.log(e)
+        var answer = {
+            "Type": "Error",
+            "Result": e
+        }
+    }
+    ws.send(JSON.stringify(answer));
+}
+
+async function refreshSurveyByID(obj, ws) {
+    try {
+        var survey = await Surveys.findById(obj.surveyID);
+        var answer = {
+            "Type": "Answer",
+            "Refresh": "SurveyByID",
+            "Result": survey
+        }
+    } catch (e) {
+        console.log(e)
+        var answer = {
+            "Type": "Error",
+            "Result": e
+        }
+    }
+    ws.send(JSON.stringify(answer));
+}
+
+async function refreshSession(obj, ws) {
+    try {
+        var sessionm = Session.find({ _id: obj.sessionID })
+        var answer = {
+            "Type": "Refresh",
+            "Refresh": "Session",
+            "Result": sessionm
+        }
+    } catch (e) {
+        console.log(e)
+        var answer = {
+            "Type": "Error",
+            "Result": e
+        }
+    }
+    ws.send(JSON.stringify(answer));
+}
+
+async function refreshAllSessions(obj, ws) {
+    try {
+        var sessions = await Session.find({});
+        var answer = {
+            "Type": "Refresh",
+            "Refresh": "AllSessions",
+            "Result": sessions
+        }
+    } catch (e) {
+        console.log(e)
+        var answer = {
+            "Type": "Error",
+            "Result": e
+        }
+    }
+    ws.send(JSON.stringify(answer));
+}
+
+async function refreshAllSurvey(obj, ws) {
+    try {
+        var surveys = await Surveys.find({});
+        var answer = {
+            "Type": "Refresh",
+            "Refresh": "AllSurvey",
+            "Result": surveys
+        }
+    } catch (e) {
+        console.log(e)
+        var answer = {
+            "Type": "Error",
+            "Result": e
+        }
+    }
+    ws.send(JSON.stringify(answer));
+}
