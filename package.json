@@ -2,9 +2,9 @@
   "name": "surveyer",
   "version": "1.0.0",
   "description": "��#\u0000 \u0000S\u0000u\u0000r\u0000v\u0000e\u0000y\u0000e\u0000r\u0000\r\u0000 \u0000",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
-    "dev": "node index.js",
+    "dev": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -21,6 +21,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
     "express": "^4.17.3",
+    "http-errors": "^2.0.0",
     "mongoose": "^6.2.7",
     "ws": "^8.5.0"
   }

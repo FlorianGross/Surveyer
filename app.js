@@ -9,6 +9,120 @@ app.use(cors);
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
+class SocketServer {
+    constructor(server) {
+        var CLIENTS = []
+        var id = 0;
+        this.listen = () => {
+            SocketServer.websocket.on('connection', async (socket) => {
+                CLIENTS.push(socket)
+                console.log("New Client Connected " + id++);
+                socket.isAlive = true;
+                handleMessage(socket, new EventModel().createFromEvent(EventType.IN_EVENT_ONLINE, {}));
+                this.listenForSocketEvents(socket);
+            });
+        };
+        this.listenForSocketEvents = (socket) => {
+            socket.on('message', async (data) => {
+                handleMessage(socket, new EventModel().createFromAny(data));
+            });
+            socket.on('close', async () => {
+                CLIENTS.pop(socket)
+                console.log("Client disconnected")
+                await handleMessage(socket, new EventModel().createFromEvent(EventType.IN_EVENT_OFFLINE, {}));
+            });
+        };
+        this.beginPing = () => {
+            setInterval(function ping() {
+                SocketServer.websocket.CLIENTS.forEach(function each(socket) {
+                    if (socket.isAlive === false)
+                        return socket.terminate();
+                    socket.isAlive = false;
+                    socket.ping(function noop() { });
+                });
+            }, 30000);
+        };
+        SocketServer.websocket = initWs(server);
+        this.listen();
+        this.beginPing();
+    }
+    static getWebsocketServer() {
+        return this.websocket;
+    }
+}
+
+function initWs(server) {
+    return new WebSocket.Server({
+        server: server,
+        clientTracking: true,
+    });
+}
+
+handleMessage = (socket, eventModel) => {
+    console.log(eventModel.eventType);
+    switch (eventModel.eventType) {
+        case EventType.IN_EVENT_ONLINE:
+            sendEvent(socket, createWelcomeEventModel());
+            break;
+        case EventType.IN_EVENT_MESSAGE:
+            processMessage(socket, eventModel.payload);
+            break;
+    }
+};
+
+createWelcomeEventModel = () => {
+    return new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, `Welcome`);
+};
+
+processMessage = (socket, payload) => {
+    console.log("Process Message");
+    useJSON(payload, socket);
+};
+
+sendEvent = (socket, eventModel) => {
+    console.log("Send Event:" + eventModel.payload);
+    socket.send(JSON.stringify({ event: eventModel.eventType, payload: eventModel.payload }));
+};
+
+closeConnection = async (message) => {
+    console.log("Closing connection");
+};
+
+class EventModel {
+    constructor() {
+        this.createFromEvent = (eventType, payload) => {
+            this.eventType = eventType;
+            this.payload = payload;
+            return this;
+        };
+        this.createFromAny = (data) => {
+            try {
+                const object = JSON.parse(data);
+                if (!object.hasOwnProperty('event'))
+                    return;
+                this.eventType = object.event;
+                this.payload = object.payload;
+                console.log(this.payload);
+            }
+            catch (e) {
+                console.error('Json parse error: ', e);
+            }
+            return this;
+        };
+    }
+}
+var EventType;
+(function (EventType) {
+    // In Events
+    EventType["IN_EVENT_ONLINE"] = "online";
+    EventType["IN_EVENT_MESSAGE"] = "message";
+    EventType["IN_EVENT_REQUEST_QUE"] = "request_que";
+    EventType["IN_EVENT_OFFLINE"] = "offline";
+    // Out Events
+    EventType["OUT_EVENT_ONLINE"] = "online";
+    EventType["OUT_EVENT_MESSAGE"] = "message";
+})(EventType = EventType || (EventType = {}));
+
 const sessionSchema = new Schema({
     owner: {
         type: mongoose.Schema.Types.ObjectId,
@@ -55,54 +169,37 @@ var User = mongoose.model('User', userSchema);
 
 const server = require('http').createServer(app);
 
-const wss = new WebSocket.Server({ server: server });
-
-var CLIENTS = []
-var id = 0;
-wss.on('connection', async (ws) => {
-    CLIENTS.push(ws)
-    console.log(CLIENTS.length)
-    console.log("New Client Connected " + id++);
-    ws.on('message', async (message) => {
-        console.log('received: %s', message);
-        var obj = JSON.parse(message);
-        useJSON(obj, ws);
-    });
-    ws.on('close', () => {
-        CLIENTS.pop(ws)
-        console.log(CLIENTS.length)
-        console.log("Client disconnected")
-    })
-});
+var wss = new SocketServer(server);
 
 server.listen(process.env.PORT || 3000, () => {
     console.log(`Server started on port ${server.address().port}`);
 });
 
-async function useJSON(obj, ws) {
-    switch (obj.Type) {
+async function useJSON(payload, ws) {
+    console.log(payload.Type);
+    switch (payload.Type) {
         case "registerClient": {
-            registerClient(obj, ws);
+            registerClient(ws);
             break;
         }
         case "registerUser": {
-            registerUser(obj, ws);
+            registerUser(payload, ws);
             break;
         }
         case "startSession": {
-            startSession(obj, ws);
+            startSession(payload, ws);
             break;
         }
         case "stopSession": {
-            stopSession(obj, ws);
+            stopSession(payload, ws);
             break;
         }
         case "startSurvey": {
-            startSurvey(obj, ws);
+            startSurvey(payload, ws);
             break;
         }
         case "stopSurvey": {
-            stopSurvey(obj, ws);
+            stopSurvey(payload, ws);
             break;
         }
         case "callRefresh":{
@@ -110,26 +207,27 @@ async function useJSON(obj, ws) {
             break;
         }
         case "refreshAll": {
-            refreshAll(obj, ws);
+            refreshAll(payload, ws);
             break;
         }
         case "refreshSurveyByID": {
-            refreshSurveyByID(obj, ws);
+            refreshSurveyByID(payload, ws);
             break;
         }
         case "refreshSurveyByUID": {
-            refreshSurveyByUID(obj, ws);
+            refreshSurveyByUID(payload, ws);
             break;
         }
         case "refreshSession": {
-            refreshSession(obj, ws);
+            refreshSession(payload, ws);
             break;
         }
         default:
-            missingType(obj, ws);
+            missingType(payload, ws);
             break;
     }
 }
+
 
 async function startSession(obj, ws) {
     try {
@@ -141,13 +239,17 @@ async function startSession(obj, ws) {
         });
         var answer = {
             "Type": "Answer",
-            "sessionId": sessionTemp._id
+            "Result": sessionTemp._id
         }
-        ws.send(JSON.stringify(answer));
     } catch (e) {
-        ws.send(JSON.stringify({ "Type": "Error", "Message": e }));
+        var answer = {
+            "Type": "Error",
+            "Result": e
+        }
         console.log("Error in startSession" + e);
     }
+    console.log(answer);
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
 async function stopSession(obj, ws) {
@@ -166,7 +268,7 @@ async function stopSession(obj, ws) {
             "Result": e
         }
     }
-    ws.send(JSON.stringify(answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
 async function startSurvey(obj, ws) {
@@ -194,7 +296,7 @@ async function startSurvey(obj, ws) {
             "Result": e
         }
     }
-    ws.send(JSON.stringify(answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
 async function stopSurvey(obj) {
@@ -216,11 +318,16 @@ async function registerClient(ws) {
             "Result": e
         }
     }
-    ws.send(JSON.stringify(answer));
+    console.log(answer);
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
 async function missingType(obj, ws) {
-    ws.send(JSON.stringify({ "Type": "Error", "Result": obj }));
+    var answer = {
+        "Type": "Error",
+        "Result": obj
+    }
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
 async function registerUser(obj, ws){
@@ -243,12 +350,12 @@ async function registerUser(obj, ws){
             "Status": -1,
         }
     }
-    ws.send(JSON.stringify(answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
 async function sendMessageToAll(obj) {
     for (i = 0; i < CLIENTS.length; i++) {
-        CLIENTS[i].send(obj);
+        sendEvent(CLIENTS[i], new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(obj)));
     }
 }
 
@@ -258,7 +365,7 @@ async function callRefresh(){
             "Type":"Answer",
             "Result":"callRefresh"
         }
-        sendMessageToAll(JSON.stringify(answer));
+        sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 
     }catch(e){
         console.log(e);
@@ -287,7 +394,7 @@ async function refreshSurveyByUID(obj, ws) {
             "Result": e
         }
     }
-    ws.send(JSON.stringify(answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
 async function refreshSurveyByID(obj, ws) {
@@ -305,7 +412,7 @@ async function refreshSurveyByID(obj, ws) {
             "Result": e
         }
     }
-    ws.send(JSON.stringify(answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
 async function refreshSession(obj, ws) {
@@ -323,10 +430,10 @@ async function refreshSession(obj, ws) {
             "Result": e
         }
     }
-    ws.send(JSON.stringify(answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
-async function refreshAllSessions(obj, ws) {
+async function refreshAllSessions(ws) {
     try {
         var sessions = await Session.find({});
         var answer = {
@@ -341,10 +448,10 @@ async function refreshAllSessions(obj, ws) {
             "Result": e
         }
     }
-    ws.send(JSON.stringify(answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
 
-async function refreshAllSurvey(obj, ws) {
+async function refreshAllSurvey(ws) {
     try {
         var surveys = await Surveys.find({});
         var answer = {
@@ -359,48 +466,5 @@ async function refreshAllSurvey(obj, ws) {
             "Result": e
         }
     }
-    ws.send(JSON.stringify(answer));
-}
-
-async function waitForMongoDBStart(uri, timeoutMs) {
-
-    return new Promise( async (resolve, reject) => {
-
-        let endTime = Date.now() + timeoutMs;
-
-
-        while (true) {
-
-            let connectionError;
-
-            function errorHandler(err) {
-                connectionError = err;
-            }
-            mongoose.connection.once("error", errorHandler);
-
-            await mongoose.connect(uri, {
-                connectTimeoutMS: 5000, // This timeout applies only after connected & connection lost
-                useNewUrlParser: true,
-                useFindAndModify: false
-            });
-
-            // Time for error event propagation
-            //await sleep(0);
-
-            if ( ! connectionError) {
-                mongoose.connection.removeListener("error", errorHandler);
-                return resolve(); // All OK, connected
-            }
-
-            if (connectionError.name !== "MongoNetworkError") {
-                return reject(`Unable to connect mongoDB. Details: ${connectionError}`);
-            }
-
-            if (Date.now() > endTime) {
-                return reject(`Unable to connect mongoBD in ${timeoutMs} ms. Details: ${connectionError}`);
-            }
-
-        }
-
-    });
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
