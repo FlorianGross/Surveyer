@@ -26,6 +26,9 @@ class SocketServer {
             socket.on('message', async (data) => {
                 handleMessage(socket, new EventModel().createFromAny(data));
             });
+            socket.on('pong', data => {
+                socket.isAlive = true;
+            });
             socket.on('close', async () => {
                 CLIENTS.pop(socket)
                 console.log("Client disconnected")
@@ -34,7 +37,7 @@ class SocketServer {
         };
         this.beginPing = () => {
             setInterval(function ping() {
-                SocketServer.websocket.CLIENTS.forEach(function each(socket) {
+                SocketServer.websocket.clients.forEach(function each(socket) {
                     if (socket.isAlive === false)
                         return socket.terminate();
                     socket.isAlive = false;
@@ -75,7 +78,6 @@ createWelcomeEventModel = () => {
 };
 
 processMessage = (socket, payload) => {
-    console.log("Process Message");
     useJSON(payload, socket);
 };
 
@@ -466,5 +468,5 @@ async function refreshAllSurvey(ws) {
             "Result": e
         }
     }
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
+    sendEvent(ws, new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer)));
 }
