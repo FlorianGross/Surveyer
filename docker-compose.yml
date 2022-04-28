@@ -12,13 +12,13 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
 
-  surveyer_api:
-    image: fmgross/surveyer_api
-    restart: always
-    ports:
-      - 3020:3000
-    environment:
-      MONGO_DB_USER: root
-      MONGO_DB_PASSWORD: example
-      MONGO_DB_NAME: localhost
-      MONGO_DB_PORT: 27019
+  #surveyer_api:
+   # image: fmgross/surveyer_api
+    #restart: always
+    #ports:
+     # - 3020:3000
+    #environment:
+     # MONGO_DB_USER: root
+      #MONGO_DB_PASSWORD: example
+      #MONGO_DB_NAME: localhost
+      #MONGO_DB_PORT: 27019
