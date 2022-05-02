@@ -86,7 +86,7 @@ createWelcomeEventModel = () => {
 };
 
 sendEvent = (socket, eventModel) => {
-  console.log("Send Event:" + eventModel);
+  console.log("Send Event:" + eventModel.payload);
   socket.send(
     JSON.stringify({ event: eventModel.eventType, payload: eventModel.payload })
   );
@@ -139,11 +139,14 @@ const sessionSchema = new Schema({
       ref: "User",
     },
   ],
+  surveys: [
+    {type: mongoose.Schema.Types.ObjectId, ref: "Survey",},
+  ],
   isActive: Boolean,
 });
 
 const userSchema = new Schema({
-  userName: String,
+  username: String,
   email: String,
   password: String,
 });
@@ -202,52 +205,12 @@ server.listen(process.env.PORT || 3000, () => {
 async function useJSON(payload, ws) {
   console.log(payload.type);
   switch (payload.type) {
-    case "registerClient": {
-      registerClient(ws);
-      break;
-    }
     case "loginUser": {
       loginUser(payload, ws);
       break;
     }
     case "registerUser": {
       registerUser(payload, ws);
-      break;
-    }
-    case "startSession": {
-      startSession(payload, ws);
-      break;
-    }
-    case "stopSession": {
-      stopSession(payload, ws);
-      break;
-    }
-    case "startSurvey": {
-      startSurvey(payload, ws);
-      break;
-    }
-    case "stopSurvey": {
-      stopSurvey(payload, ws);
-      break;
-    }
-    case "callRefresh": {
-      callRefresh(this.CLIENTS);
-      break;
-    }
-    case "refreshAll": {
-      refreshAll(payload, ws);
-      break;
-    }
-    case "refreshSurveyByID": {
-      refreshSurveyByID(payload, ws);
-      break;
-    }
-    case "refreshSurveyByUID": {
-      refreshSurveyByUID(payload, ws);
-      break;
-    }
-    case "refreshSession": {
-      refreshSession(payload, ws);
       break;
     }
     default:
@@ -258,8 +221,8 @@ async function useJSON(payload, ws) {
 
 async function loginUser(obj, ws) {
   try {
-    const user = await User.findOne({ userName: obj.userName });
-    if (user.password === obj.Password) {
+    const user = await User.findOne({ userName: obj.result.userName });
+    if (user.password === obj.result.Password) {
       var answer = {
         type: "Result",
         result: "Success",
@@ -275,6 +238,45 @@ async function loginUser(obj, ws) {
     var answer = {
       type: "Result",
       result: "Unsuccessful",
+    };
+  }
+  sendEvent(
+    ws,
+    new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer)
+  );
+}
+
+async function missingType(obj, ws) {
+  var answer = {
+    type: "Result",
+    result: "Error",
+    error: obj,
+  };
+  sendEvent(
+    ws,
+    new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer)
+  );
+}
+
+async function registerUser(obj, ws) {
+  var answer;
+  try {
+    var user = await User.create({
+      username: obj.result.userName,
+      email: obj.result.email,
+      password: obj.result.password,
+    });
+    answer = {
+      type: "Result",
+      result: "Success",
+      uid: user._id
+    };
+  } catch (e) {
+    console.log(e);
+    answer = {
+      type: "Result",
+      result: "Error",
+      error: e,
     };
   }
   sendEvent(
@@ -382,43 +384,6 @@ async function registerClient(ws) {
     };
   }
   console.log(answer);
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
-}
-
-async function missingType(obj, ws) {
-  var answer = {
-    type: "Result",
-    result: "Error",
-    error: obj,
-  };
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
-}
-
-async function registerUser(obj, ws) {
-  try {
-    var user = await User.create({
-      userName: obj.name,
-      email: obj.email,
-      password: obj.password,
-    });
-    var answer = {
-      type: "Answer",
-      result: "Successful",
-    };
-  } catch (e) {
-    console.log(e);
-    var answer = {
-      type: "Result",
-      result: "Error",
-      error: e,
-    };
-  }
   sendEvent(
     ws,
     new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
