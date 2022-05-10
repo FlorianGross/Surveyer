@@ -13,7 +13,8 @@ dependencies:
   dotenv: 16.0.0
   express: 4.17.3
   http-errors: 2.0.0
-  mongoose: 6.2.8
+  mongoose: 6.2.9
+
   ws: 8.5.0
 
 packages:
@@ -136,11 +137,6 @@ packages:
     engines: {node: '>=0.10'}
     dev: false
 
-  /depd/1.1.2:
-    resolution: {integrity: sha1-m81S4UwJd2PnSbJ0xDRu0uVgtak=}
-    engines: {node: '>= 0.6'}
-    dev: false
-
   /depd/2.0.0:
     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
     engines: {node: '>= 0.8'}
@@ -232,17 +228,6 @@ packages:
     engines: {node: '>= 0.6'}
     dev: false
 
-  /http-errors/1.8.1:
-    resolution: {integrity: sha512-Kpk9Sm7NmI+RHhnj6OIWDI1d6fIoFAtFt9RLaTMRlg/8w49juAStsrBgp0Dp4OdxdVbRIeKhtCUvoi/RuAhO4g==}
-    engines: {node: '>= 0.6'}
-    dependencies:
-      depd: 1.1.2
-      inherits: 2.0.4
-      setprototypeof: 1.2.0
-      statuses: 1.5.0
-      toidentifier: 1.0.1
-    dev: false
-
   /http-errors/2.0.0:
     resolution: {integrity: sha512-FtwrG/euBzaEjYeRqOgly7G0qviiXoJWnvEH2Z1plBdXgbyjv34pHTSb9zoeHMyDy33+DWy5Wt9Wo+TURtOYSQ==}
     engines: {node: '>= 0.8'}
@@ -278,8 +263,8 @@ packages:
     engines: {node: '>= 0.10'}
     dev: false
 
-  /kareem/2.3.4:
-    resolution: {integrity: sha512-Vcrt8lcpVl0s8ePx634BxwRqmFo+5DcOhlmNadehxreMTIQi/9hOL/B3hZQQbK5DgMS7Lem3xABXV7/S3jy+7g==}
+  /kareem/2.3.5:
+    resolution: {integrity: sha512-qxCyQtp3ioawkiRNQr/v8xw9KIviMSSNmy+63Wubj7KmMn3g7noRXIZB4vPCAP+ETi2SR8eH6CvmlKZuGpoHOg==}
     dev: false
 
   /media-typer/0.3.0:
@@ -338,12 +323,12 @@ packages:
       saslprep: 1.0.3
     dev: false
 
-  /mongoose/6.2.8:
-    resolution: {integrity: sha512-Wq6HG0sOJEQHp5YqMlxrnf93vBFwdY2zlAwqI97EPPSt69kiVV21pTv4cDanrCNWi4upG8ajQ/p9jpDjcECjkQ==}
+  /mongoose/6.2.9:
+    resolution: {integrity: sha512-6ApgF3rKYah5pUEO/1H+QrT0GT05OR7FprtVM45yzcrT/IKKlXizPyttrMiK1mLPt+55pGU7PMsBWY7yx/xZ4g==}
     engines: {node: '>=12.0.0'}
     dependencies:
       bson: 4.6.2
-      kareem: 2.3.4
+      kareem: 2.3.5
       mongodb: 4.3.1
       mpath: 0.8.4
       mquery: 4.0.2
@@ -511,11 +496,6 @@ packages:
       memory-pager: 1.5.0
     dev: false
     optional: true
-
-  /statuses/1.5.0:
-    resolution: {integrity: sha1-Fhx9rBd2Wf2YEfQ3cfqZOBR4Yow=}
-    engines: {node: '>= 0.6'}
-    dev: false
 
   /statuses/2.0.1:
     resolution: {integrity: sha512-RwNA9Z/7PrK06rYLIzFMlaF+l73iwpzsqRIFgbMLbTcLD6cOao82TaWefPXQvB2fOC4AjuYSEndS7N/mTCbkdQ==}
