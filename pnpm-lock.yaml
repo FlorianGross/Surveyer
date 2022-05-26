@@ -1,4 +1,4 @@
-lockfileVersion: 5.3
+lockfileVersion: 5.4
 
 specifiers:
   cors: ^2.8.5
@@ -14,7 +14,6 @@ dependencies:
   express: 4.17.3
   http-errors: 2.0.0
   mongoose: 6.2.9
-
   ws: 8.5.0
 
 packages:
@@ -137,6 +136,11 @@ packages:
     engines: {node: '>=0.10'}
     dev: false
 
+  /depd/1.1.2:
+    resolution: {integrity: sha1-m81S4UwJd2PnSbJ0xDRu0uVgtak=}
+    engines: {node: '>= 0.6'}
+    dev: false
+
   /depd/2.0.0:
     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
     engines: {node: '>= 0.8'}
@@ -226,6 +230,17 @@ packages:
   /fresh/0.5.2:
     resolution: {integrity: sha1-PYyt2Q2XZWn6g1qx+OSyOhBWBac=}
     engines: {node: '>= 0.6'}
+    dev: false
+
+  /http-errors/1.8.1:
+    resolution: {integrity: sha512-Kpk9Sm7NmI+RHhnj6OIWDI1d6fIoFAtFt9RLaTMRlg/8w49juAStsrBgp0Dp4OdxdVbRIeKhtCUvoi/RuAhO4g==}
+    engines: {node: '>= 0.6'}
+    dependencies:
+      depd: 1.1.2
+      inherits: 2.0.4
+      setprototypeof: 1.2.0
+      statuses: 1.5.0
+      toidentifier: 1.0.1
     dev: false
 
   /http-errors/2.0.0:
@@ -496,6 +511,11 @@ packages:
       memory-pager: 1.5.0
     dev: false
     optional: true
+
+  /statuses/1.5.0:
+    resolution: {integrity: sha1-Fhx9rBd2Wf2YEfQ3cfqZOBR4Yow=}
+    engines: {node: '>= 0.6'}
+    dev: false
 
   /statuses/2.0.1:
     resolution: {integrity: sha512-RwNA9Z/7PrK06rYLIzFMlaF+l73iwpzsqRIFgbMLbTcLD6cOao82TaWefPXQvB2fOC4AjuYSEndS7N/mTCbkdQ==}
