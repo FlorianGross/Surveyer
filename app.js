@@ -46,7 +46,7 @@ class SocketServer {
         SocketServer.websocket.clients.forEach(function each(socket) {
           if (socket.isAlive === false) return socket.terminate();
           socket.isAlive = false;
-          socket.ping(function noop() {});
+          socket.ping(function noop() { });
         });
       }, 30000);
     };
@@ -140,7 +140,7 @@ const sessionSchema = new Schema({
     },
   ],
   surveys: [
-    {type: mongoose.Schema.Types.ObjectId, ref: "Survey",},
+    { type: mongoose.Schema.Types.ObjectId, ref: "Survey", },
   ],
   isActive: Boolean,
 });
@@ -170,14 +170,14 @@ async function connectToDB() {
   mongoose
     .connect(
       process.env.MONGO_DB_CONNECTION_STRING ||
-        "mongodb://" +
-          process.env.MONGO_DB_USER +
-          ":" +
-          process.env.MONGO_DB_PASSWORD +
-          "@" +
-          process.env.MONGO_DB_NAME +
-          ":" +
-          process.env.MONGO_DB_PORT,
+      "mongodb://" +
+      process.env.MONGO_DB_USER +
+      ":" +
+      process.env.MONGO_DB_PASSWORD +
+      "@" +
+      process.env.MONGO_DB_NAME +
+      ":" +
+      process.env.MONGO_DB_PORT,
       { useNewUrlParser: true, useUnifiedTopology: true, dbName: "android" }
     )
     .then(() => {
@@ -365,7 +365,7 @@ async function startSurvey(obj, ws) {
   );
 }
 
-async function stopSurvey(obj) {}
+async function stopSurvey(obj) { }
 
 async function registerClient(ws) {
   try {
