@@ -1,9 +1,11 @@
 FROM node:17.6.0
 
-ENV MONGO_DB_USER=root
-ENV MONGO_DB_PASSWORD=example
-ENV MONGO_DB_NAME=localhost
-ENV MONGO_DB_PORT=27019
+ENV MONGO_DB_USER=
+ENV MONGO_DB_PASSWORD=
+ENV MONGO_DB_NAME=
+ENV MONGO_DB_PORT=
+ENV MONGO_DB_CONNECTION_STRING=mongodb+srv://webdev:MeinCoolesPassword@cluster0.2snr7nl.mongodb.net/?retryWrites=true&w=majority
+
 
 WORKDIR /usr/src/app
 

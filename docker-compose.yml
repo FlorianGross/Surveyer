@@ -1,27 +1,6 @@
 # Use root/example as user/password credentials
 version: '3.1'
-networks:
-  surveyer_network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 192.168.0.0/24
 services:
-  mongo:
-    image: mongo
-    restart: always
-    ports:
-      - 27017:27017
-    expose:
-      - 27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: example
-    networks:
-      surveyer_network:
-        ipv4_address: 192.168.0.2
-
-
   surveyer_api:
     build:
       context: .
@@ -30,12 +9,3 @@ services:
     restart: always
     ports:
       - 3000:3000
-    environment:
-      MONGO_DB_USER: root
-      MONGO_DB_PASSWORD: example
-      MONGO_DB_NAME: 192.168.0.2
-      MONGO_DB_PORT: 27017
-    networks:
-      surveyer_network:
-        ipv4_address: 192.168.0.3
-        

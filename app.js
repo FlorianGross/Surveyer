@@ -35,6 +35,7 @@ class SocketServer {
       socket.on("close", async () => {
         CLIENTS.pop(socket);
         console.log("Client disconnected");
+        id--;
         await handleMessage(
           socket,
           new EventModel().createFromEvent(EventType.IN_EVENT_OFFLINE, {})
@@ -220,22 +221,27 @@ async function useJSON(payload, ws) {
 }
 
 async function loginUser(obj, ws) {
+  console.log("Login User");
+  var answer;
   try {
-    const user = await User.findOne({ userName: obj.result.userName });
-    if (user.password === obj.result.Password) {
-      var answer = {
-        type: "Result",
-        result: "Success",
-      };
-    } else {
-      var answer = {
-        type: "Result",
-        result: "Unsuccessful",
-      };
-    }
+    await User.findOne({ username: obj.result.userName }).then
+      ((user) => {
+        if (user.password === obj.result.password) {
+          answer = {
+            type: "Result",
+            result: "Success",
+            uid: user._id,
+          };
+        } else {
+          answer = {
+            type: "Result",
+            result: "Unsuccessful",
+          };
+        }
+      })
   } catch (e) {
     console.error("Error login" + e);
-    var answer = {
+    answer = {
       type: "Result",
       result: "Unsuccessful",
     };
@@ -247,6 +253,7 @@ async function loginUser(obj, ws) {
 }
 
 async function missingType(obj, ws) {
+  console.log("Missing type");
   var answer = {
     type: "Result",
     result: "Error",
@@ -259,6 +266,7 @@ async function missingType(obj, ws) {
 }
 
 async function registerUser(obj, ws) {
+  console.log("Registering user");
   var answer;
   try {
     var user = await User.create({
@@ -286,6 +294,42 @@ async function registerUser(obj, ws) {
 }
 
 async function startSession(obj, ws) {
+  console.log("Start session");
+  var answer;
+  try {
+    await User.findOne({ _id: obj.result.uid }).then((user) => {
+      Session.create({
+        owner: user._id,
+        participants: [user._id],
+        surveys: [],
+        isActive: true,
+      }).then((session) => {
+        answer = {
+          type: "Answer",
+          result: session._id,
+        };
+      }).catch((e) => {
+        console.log(e);
+      });
+    }).catch((err) => {
+      console.log(err);
+    });
+  } catch
+  (e) {
+    console.log(e);
+    answer = {
+      type: "Result",
+      result: "Error",
+      error: e,
+    }
+    sendEvent(
+      ws,
+      new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer)
+    );
+  }
+}
+
+async function startSessioan(obj, ws) {
   try {
     var usertmp = await User.findById(obj.uid);
     var sessionTemp = await Session.create({
