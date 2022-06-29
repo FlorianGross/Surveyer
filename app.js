@@ -68,7 +68,7 @@ function initWs(server) {
 }
 
 handleMessage = (socket, eventModel) => {
-  console.log(eventModel);
+  console.log("Handle Message:" + eventModel);
   switch (eventModel.eventType) {
     case EventType.IN_EVENT_ONLINE:
       sendEvent(socket, createWelcomeEventModel());
@@ -87,7 +87,7 @@ createWelcomeEventModel = () => {
 };
 
 sendEvent = (socket, eventModel) => {
-  console.log("Send Event:" + eventModel.payload);
+  console.log("Send Event:" + JSON.stringify({ event: eventModel.eventType, payload: eventModel.payload }));
   socket.send(
     JSON.stringify({ event: eventModel.eventType, payload: eventModel.payload })
   );
@@ -143,6 +143,8 @@ const sessionSchema = new Schema({
   surveys: [
     { type: mongoose.Schema.Types.ObjectId, ref: "Survey", },
   ],
+  name: String,
+  description: String,
   isActive: Boolean,
 });
 
@@ -161,9 +163,10 @@ const surveySchema = new Schema({
   surveyDescription: String,
   surveyOpened: Boolean,
   surveyName: String,
-  surveyApprove: Number,
-  surveyDeny: Number,
-  surveyNotParicipate: Number,
+  surveyApprove: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  surveyDeny: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  surveyNotParicipate: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  anonymous: Boolean,
   participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 });
 
@@ -204,7 +207,7 @@ server.listen(process.env.PORT || 3000, () => {
 });
 
 async function useJSON(payload, ws) {
-  console.log(payload.type);
+  console.log("Use JSON:" + JSON.stringify(payload));
   switch (payload.type) {
     case "loginUser": {
       loginUser(payload, ws);
@@ -214,10 +217,102 @@ async function useJSON(payload, ws) {
       registerUser(payload, ws);
       break;
     }
+    case "createSession": {
+      startSession(payload, ws);
+      break;
+    }
+    case "getAllSurveysFromSession": {
+      getAllSurveysFromSession(payload, ws);
+      break;
+    }
+    case "getAllSurveys": {
+      getAllSurveys(payload, ws);
+      break;
+    }
+    case "getAllSessions": {
+      getAllSessions(payload, ws);
+      break;
+    }
+    case "createSurvey": {
+      createSurvey(payload, ws);
+      break;
+    }
+    case "getSurveyFromID": {
+      getSurveyFromID(payload, ws);
+      break;
+    }
     default:
       missingType(payload, ws);
       break;
   }
+}
+
+async function getAllSurveys(payload, ws) {
+  console.log("Get all surveys");
+  var answer;
+  Surveys.find({
+  }).then((result) => {
+    answer = {
+      type: "Result",
+      result: "Surveys",
+      events: result,
+    };
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  }).catch((err) => {
+    console.log(err);
+    answer = {
+      type: "Error",
+      result: "Error",
+      error: err,
+    }
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  });
+}
+
+async function getAllSurveysFromSession(payload, ws) {
+  console.log("Get all surveys from session");
+  var answer;
+  Surveys.find({
+    surveySession: payload.result.sessionId,
+  }).then((result) => {
+    answer = {
+      type: "Result",
+      result: "Surveys",
+      events: result,
+    };
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  }).catch((err) => {
+    console.log(err);
+    answer = {
+      type: "Error",
+      result: "Error",
+      error: err,
+    }
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  });
+}
+
+async function getAllSessions(payload, ws) {
+  console.log("Get all sessions");
+  var answer;
+  Session.find({
+    participants: { $in: [payload.result.uid] },
+  }).then((result) => {
+    answer = {
+      type: "Result",
+      result: "Sessions",
+      events: result,
+    };
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  }).catch((err) => {
+    console.log(err);
+    answer = {
+      type: "Error",
+      result: "Error",
+      error: err,
+    }
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  });
 }
 
 async function loginUser(obj, ws) {
@@ -246,10 +341,9 @@ async function loginUser(obj, ws) {
       result: "Unsuccessful",
     };
   }
-  sendEvent(
-    ws,
-    new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer)
-  );
+
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  
 }
 
 async function missingType(obj, ws) {
@@ -287,72 +381,33 @@ async function registerUser(obj, ws) {
       error: e,
     };
   }
-  sendEvent(
-    ws,
-    new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer)
-  );
+
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
 
 async function startSession(obj, ws) {
   console.log("Start session");
   var answer;
-  try {
-    await User.findOne({ _id: obj.result.uid }).then((user) => {
-      Session.create({
-        owner: user._id,
-        participants: [user._id],
-        surveys: [],
-        isActive: true,
-      }).then((session) => {
-        answer = {
-          type: "Answer",
-          result: session._id,
-        };
-      }).catch((e) => {
-        console.log(e);
-      });
-    }).catch((err) => {
-      console.log(err);
-    });
-  } catch
-  (e) {
-    console.log(e);
+  Session.create({
+    owner: obj.result.uid,
+    participants: [obj.result.uid],
+    surveys: [],
+    isActive: true,
+  }).then((session) => {
+    answer = {
+      type: "Answer",
+      result: session._id,
+    };
+  }).catch((err) => {
+    console.log(err);
     answer = {
       type: "Result",
       result: "Error",
-      error: e,
-    }
-    sendEvent(
-      ws,
-      new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer)
-    );
-  }
-}
-
-async function startSessioan(obj, ws) {
-  try {
-    var usertmp = await User.findById(obj.uid);
-    var sessionTemp = await Session.create({
-      owner: usertmp,
-      participants: [usertmp],
-      isActive: true,
-    });
-    var answer = {
-      type: "Answer",
-      result: sessionTemp._id,
+      error: err,
     };
-  } catch (e) {
-    var answer = {
-      type: "Error",
-      result: e,
-    };
-    console.log("Error in startSession" + e);
-  }
+  });
   console.log(answer);
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
 
 async function stopSession(obj, ws) {
@@ -372,210 +427,150 @@ async function stopSession(obj, ws) {
       error: e,
     };
   }
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
+
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
 
-async function startSurvey(obj, ws) {
+async function createSurvey(obj, ws) {
+  console.log("Create survey");
+  var answer;
   try {
-    var user = await User.findById(obj.uid);
-    var surveyTemp = await Surveys.create({
-      surveySession: await Session.findById(obj.sessionId),
-      creator: obj.uid,
-      surveyOpened: true,
-      surveyName: obj.surveyName,
-      surveyApprove: 0,
-      surveyDeny: 0,
-      surveyNotParicipate: 0,
-      participants: [user],
+    User.findById(obj.result.creator).then((user) => {
+      if (user) {
+        var surveyVals = {
+          surveyName: obj.result.surveyName,
+          creator: user._id,
+          surveyDescription: obj.result.surveyDescription,
+          surveyOpened: obj.result.surveyOpened,
+          surveyName: obj.result.surveyName,
+          surveyApprove: [],
+          anonymous: obj.result.anonymous,
+          surveyDeny: [],
+          surveyNotParicipate: [],
+          anonymous: obj.result.anonymous,
+          participants: [],
+          surveySession: obj.result.surveySession,
+        };
+        Surveys.create(surveyVals).then((survey) => {
+          answer = {
+            type: "Answer",
+            result: survey._id,
+          };
+        });
+      } else {
+        answer = {
+          type: "Result",
+          result: "Error",
+          error: "User not found",
+        };
+      }
+    })
+  } catch (e) {
+    console.log(e);
+    answer = {
+      type: "Result",
+      result: "Error",
+      error: e,
+    };
+  }
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+}
+
+async function voteForSurvey(obj, ws) {
+  console.log("Vote for survey");
+  var answer;
+  try {
+    User.findById(obj.result.uid).then((user) => {
+      if (user) {
+        Surveys.findById(obj.result.surveyID).then((survey) => {
+          if (survey) {
+            if (survey.participants.includes(obj.result.uid)) {
+              answer = {
+                type: "Result",
+                result: "Already voted",
+              };
+            } else {
+              if (survey.anonymous) {
+                if (obj.result.sendID == 0) {
+                  survey.surveyApprove.push(-1);
+                } else if (obj.result.sendID == 1) {
+                  survey.surveyDeny.push(-1);
+                } else if (obj.result.sendID == 2) {
+                  survey.surveyNotParicipate.push(-1);
+                } else {
+                  answer = {
+                    type: "Result",
+                    result: "Error",
+                    error: "Invalid sendID",
+                  };
+                }
+              } else {
+                if (obj.result.sendID == 0) {
+                  survey.surveyApprove.push(user._id);
+                } else if (obj.result.sendID == 1) {
+                  survey.surveyDeny.push(user._id);
+                } else if (obj.result.sendID == 2) {
+                  survey.surveyNotParicipate.push(user._id);
+                } else {
+                  answer = {
+                    type: "Result",
+                    result: "Error",
+                    error: "Invalid sendID",
+                  };
+                }
+              }
+              if (answer == null) {
+                survey.participants.push(user._id);
+                survey.save();
+                answer = {
+                  type: "Answer",
+                  result: "Voted Successful",
+                  event: survey,
+                };
+              }
+            }
+          }
+        });
+      }
     });
-    var answer = {
-      type: "Answer",
-      surveyID: surveyTemp._id,
-    };
   } catch (e) {
     console.log(e);
-    var answer = {
+    answer = {
       type: "Result",
       result: "Error",
       error: e,
     };
   }
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
 
-async function stopSurvey(obj) { }
-
-async function registerClient(ws) {
+async function getSurveyFromID(obj, ws) {
+  console.log("Get survey from ID " + obj.result.surveyId);
+  var answer;
   try {
-    var user = await User.create({});
-    var answer = {
-      type: "Answer",
-      result: "Client registered Successful",
-      uid: user._id,
-    };
+    await Surveys.findById(obj.result.surveyId).then((survey) => {
+      if (survey) {
+        answer = {
+          type: "Answer",
+          result: "Survey",
+          event: survey,
+        };
+      } else {
+        answer = {
+          type: "Result",
+          result: "Error",
+          error: "Survey not found",
+        };
+      }
+    })
   } catch (e) {
     console.log(e);
-    var answer = {
+    answer = {
       type: "Result",
       result: "Error",
       error: e,
     };
   }
-  console.log(answer);
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
 
-async function sendMessageToAll(obj) {
-  for (i = 0; i < CLIENTS.length; i++) {
-    sendEvent(
-      CLIENTS[i],
-      new EventModel().createFromEvent(
-        EventType.OUT_EVENT_MESSAGE,
-        JSON.stringify(obj)
-      )
-    );
-  }
-}
-
-async function callRefresh() {
-  try {
-    var answer = {
-      type: "Answer",
-      result: "callRefresh",
-    };
-    sendEvent(
-      ws,
-      new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-    );
-  } catch (e) {
-    console.log(e);
-  }
-}
-
-async function refreshAll(obj, ws) {
-  refreshAllSurvey(obj, ws);
-  refreshAllSessions(obj, ws);
-}
-
-async function refreshSurveyByUID(obj, ws) {
-  try {
-    var user = await User.findById(obj.uid);
-    var surveys = await Surveys.find({ participants: user });
-    var answer = {
-      type: "Answer",
-      refresh: "SurveyByUID",
-      tesult: surveys,
-    };
-  } catch (e) {
-    console.log(e);
-    var answer = {
-      type: "Result",
-      result: "Error",
-      error: e,
-    };
-  }
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
-}
-
-async function refreshSurveyByID(obj, ws) {
-  try {
-    var survey = await Surveys.findById(obj.surveyID);
-    var answer = {
-      type: "Answer",
-      refresh: "SurveyByID",
-      result: survey,
-    };
-  } catch (e) {
-    console.log(e);
-    var answer = {
-      type: "Result",
-      result: "Error",
-      error: e,
-    };
-  }
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
-}
-
-async function refreshSession(obj, ws) {
-  try {
-    var sessionm = Session.find({ _id: obj.sessionID });
-    var answer = {
-      type: "Refresh",
-      refresh: "Session",
-      result: sessionm,
-    };
-  } catch (e) {
-    console.log(e);
-    var answer = {
-      type: "Result",
-      result: "Error",
-      error: e,
-    };
-  }
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
-}
-
-async function refreshAllSessions(ws) {
-  try {
-    var sessions = await Session.find({});
-    var answer = {
-      Type: "Refresh",
-      Refresh: "AllSessions",
-      Result: sessions,
-    };
-  } catch (e) {
-    console.log(e);
-    var answer = {
-      Type: "Result",
-      Result: "Error",
-      Error: e,
-    };
-  }
-  sendEvent(
-    ws,
-    new EventModel().createFromEvent(
-      EventType.OUT_EVENT_MESSAGE,
-      JSON.stringify(answer)
-    )
-  );
-}
-
-async function refreshAllSurvey(ws) {
-  try {
-    var surveys = await Surveys.find({});
-    var answer = {
-      Type: "Refresh",
-      Refresh: "AllSurvey",
-      Result: surveys,
-    };
-  } catch (e) {
-    console.log(e);
-    var answer = {
-      Type: "Result",
-      Result: "Error",
-      Error: e,
-    };
-  }
-  sendEvent(
-    ws,
-    new EventModel(EventType.OUT_EVENT_MESSAGE, JSON.stringify(answer))
-  );
-}

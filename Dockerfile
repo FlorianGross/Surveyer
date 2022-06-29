@@ -6,7 +6,6 @@ ENV MONGO_DB_NAME=
 ENV MONGO_DB_PORT=
 ENV MONGO_DB_CONNECTION_STRING=mongodb+srv://webdev:MeinCoolesPassword@cluster0.2snr7nl.mongodb.net/?retryWrites=true&w=majority
 
-
 WORKDIR /usr/src/app
 
 COPY package*.json ./
@@ -17,4 +16,4 @@ COPY . .
 
 EXPOSE 3000
 
-CMD [ "node", "index.js" ]
+CMD [ "node", "app.js" ]
