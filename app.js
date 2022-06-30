@@ -502,6 +502,7 @@ async function createSurvey(obj, ws) {
           result: "Error",
           error: "User not found",
         };
+      sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
       }
     })
   } catch (e) {
@@ -511,8 +512,8 @@ async function createSurvey(obj, ws) {
       result: "Error",
       error: e,
     };
-  }
   sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  }
 }
 
 async function updateSession(obj, ws){
