@@ -233,6 +233,22 @@ async function useJSON(payload, ws) {
       getAllSessions(payload, ws);
       break;
     }
+    case "joinSession":{
+      joinSession(payload, ws);
+      break;
+    }
+    case "getSessionFromID": {
+      getSessionFromID(payload, ws);
+      break;
+    }
+    case "voteForSurvey": {
+      voteForSurvey(payload, ws);
+      break;
+    }
+    case "updateSession": {
+      updateSession(payload, ws);
+      break;
+    }
     case "createSurvey": {
       createSurvey(payload, ws);
       break;
@@ -290,6 +306,7 @@ async function getAllSurveysFromSession(payload, ws) {
     }
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   });
+
 }
 
 async function getAllSessions(payload, ws) {
@@ -301,6 +318,31 @@ async function getAllSessions(payload, ws) {
     answer = {
       type: "Result",
       result: "Sessions",
+      events: result,
+    };
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  }).catch((err) => {
+    console.log(err);
+    answer = {
+      type: "Error",
+      result: "Error",
+      error: err,
+    }
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  });
+}
+
+async function joinSession(payload, ws) {
+  console.log("Join session");
+  var answer;
+  Session.findOneAndUpdate({
+    _id: payload.result.sessionId,
+  }, {
+    $addToSet: { participants: payload.result.uid },
+  }).then((result) => {
+    answer = {
+      type: "Result",
+      result: "Session",
       events: result,
     };
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
@@ -341,9 +383,7 @@ async function loginUser(obj, ws) {
       result: "Unsuccessful",
     };
   }
-
   sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
-  
 }
 
 async function missingType(obj, ws) {
@@ -353,10 +393,7 @@ async function missingType(obj, ws) {
     result: "Error",
     error: obj,
   };
-  sendEvent(
-    ws,
-    new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer)
-  );
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
 
 async function registerUser(obj, ws) {
@@ -381,7 +418,6 @@ async function registerUser(obj, ws) {
       error: e,
     };
   }
-
   sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
 
@@ -392,12 +428,16 @@ async function startSession(obj, ws) {
     owner: obj.result.uid,
     participants: [obj.result.uid],
     surveys: [],
+    name: obj.result.name,
+    description: obj.result.description,
     isActive: true,
   }).then((session) => {
     answer = {
       type: "Answer",
       result: session._id,
     };
+
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -405,9 +445,9 @@ async function startSession(obj, ws) {
       result: "Error",
       error: err,
     };
-  });
-  console.log(answer);
+
   sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  });
 }
 
 async function stopSession(obj, ws) {
@@ -427,7 +467,6 @@ async function stopSession(obj, ws) {
       error: e,
     };
   }
-
   sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
 
@@ -465,6 +504,37 @@ async function createSurvey(obj, ws) {
         };
       }
     })
+  } catch (e) {
+    console.log(e);
+    answer = {
+      type: "Result",
+      result: "Error",
+      error: e,
+    };
+  }
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+}
+
+async function updateSession(obj, ws){
+  console.log("Update session");
+  var answer;
+  try {
+    var session = await Session.findById(obj.result.id);
+    if(session){
+      session.name = obj.result.name;
+      session.description = obj.result.description;
+      await session.save();
+      answer = {
+        type: "Answer",
+        result: "Session updated Successful",
+      };
+    } else {
+      answer = {
+        type: "Result",
+        result: "Error",
+        error: "Session not found",
+      };
+    }
   } catch (e) {
     console.log(e);
     answer = {
@@ -533,6 +603,27 @@ async function voteForSurvey(obj, ws) {
         });
       }
     });
+  } catch (e) {
+    console.log(e);
+    answer = {
+      type: "Result",
+      result: "Error",
+      error: e,
+    };
+  }
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+}
+
+async function getSessionFromID(obj, ws) {
+  console.log("Get session from ID");
+  var answer;
+  try {
+    var session = await Session.findById(obj.result.sessionID);
+    answer = {
+      type: "Answer",
+      result: "Session",
+      event: session,
+    };
   } catch (e) {
     console.log(e);
     answer = {
