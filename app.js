@@ -10,6 +10,7 @@ const mongoose = require("mongoose");
 const { Console } = require("console");
 const { Schema } = mongoose;
 var CLIENTS = [];
+var anonym = "";
 
 class SocketServer {
   constructor(server) {
@@ -145,14 +146,25 @@ const sessionSchema = new Schema({
   surveys: [
     { type: mongoose.Schema.Types.ObjectId, ref: "Survey", },
   ],
-  name: String,
+  name: {
+    type: String,
+    required: true,
+    unique: true,
+  },
   description: String,
   isActive: Boolean,
 });
 
 const userSchema = new Schema({
-  username: String,
-  email: String,
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  email: {
+    type: String,
+    required: true,
+  },
   password: String,
 });
 
@@ -160,11 +172,15 @@ const surveySchema = new Schema({
   surveySession: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Sessions",
+    required: true,
   },
-  creator: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  creator: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, },
   surveyDescription: String,
   surveyOpened: Boolean,
-  surveyName: String,
+  surveyName: {
+    type: String,
+    required: true,
+  },
   surveyApprove: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   surveyDeny: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   surveyNotParicipate: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -207,6 +223,7 @@ var wss = new SocketServer(server);
 
 server.listen(process.env.PORT || 3000, () => {
   console.log(`Server started on port ${server.address().port}`);
+  getAnonymousID();
 });
 
 async function useJSON(payload, ws) {
@@ -469,7 +486,6 @@ async function startSession(obj, ws) {
       type: "Answer",
       result: session._id,
     };
-
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
     callRefresh();
   }).catch((err) => {
@@ -506,48 +522,38 @@ async function stopSession(obj, ws) {
 async function createSurvey(obj, ws) {
   console.log("Create survey");
   var answer;
-  try {
-    User.findById(obj.result.creator).then((user) => {
-      if (user) {
-        var surveyVals = {
-          surveyName: obj.result.surveyName,
-          creator: user._id,
-          surveyDescription: obj.result.surveyDescription,
-          surveyOpened: obj.result.surveyOpened,
-          surveyName: obj.result.surveyName,
-          surveyApprove: [],
-          anonymous: obj.result.anonymous,
-          surveyDeny: [],
-          surveyNotParicipate: [],
-          anonymous: obj.result.anonymous,
-          participants: [],
-          surveySession: obj.result.surveySession,
-        };
-        Surveys.create(surveyVals).then((survey) => {
-          answer = {
-            type: "Answer",
-            result: survey._id,
-          };
-        });
-      } else {
-        answer = {
-          type: "Result",
-          result: "Error",
-          error: "User not found",
-        };
-        sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
-        callRefresh();
-      }
-    })
-  } catch (e) {
-    console.log(e);
+  var surveyVals = {
+    surveyName: obj.result.surveyName,
+    creator: obj.result.creator,
+    surveyDescription: obj.result.surveyDescription,
+    surveyOpened: obj.result.surveyOpened,
+    surveyName: obj.result.surveyName,
+    surveyApprove: [],
+    anonymous: obj.result.anonymous,
+    allowEnthaltung: obj.result.allowEnthaltung,
+    surveyDeny: [],
+    surveyNotParicipate: [],
+    participants: [],
+    surveySession: obj.result.surveySession,
+  };
+  Surveys.create(surveyVals).then((survey) => {
+    answer = {
+      type: "Answer",
+      result: survey._id,
+    };
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    callRefresh();
+  }
+  ).catch((err) => {
+    console.log(err);
     answer = {
       type: "Result",
       result: "Error",
-      error: e,
+      error: err,
     };
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   }
+  );
 }
 
 async function updateSession(obj, ws) {
@@ -586,57 +592,56 @@ async function voteForSurvey(obj, ws) {
   var answer;
   try {
     User.findById(obj.result.uid).then((user) => {
-      if (user) {
-        Surveys.findById(obj.result.surveyID).then((survey) => {
-          if (survey) {
-            if (survey.participants.includes(obj.result.uid)) {
-              answer = {
-                type: "Result",
-                result: "Already voted",
-              };
-            } else {
-              if (survey.anonymous) {
-                if (obj.result.sendID == 0) {
-                  survey.surveyApprove.push(-1);
-                } else if (obj.result.sendID == 1) {
-                  survey.surveyDeny.push(-1);
-                } else if (obj.result.sendID == 2) {
-                  survey.surveyNotParicipate.push(-1);
-                } else {
-                  answer = {
-                    type: "Result",
-                    result: "Error",
-                    error: "Invalid sendID",
-                  };
-                }
+      Surveys.findById(obj.result.surveyID).then((survey) => {
+        if (survey.participants.includes(obj.result.uid)) {
+          answer = {
+            type: "Result",
+            result: "Already voted",
+          };
+        } else {
+          if (survey.anonymous) {
+              console.log("ID of Anonymous" + anonym);
+              if (obj.result.sendID == 0) {
+                survey.surveyApprove.push(anonym);
+              } else if (obj.result.sendID == 1) {
+                survey.surveyDeny.push(anonym);
+              } else if (obj.result.sendID == 2) {
+                survey.surveyNotParicipate.push(anonym);
               } else {
-                if (obj.result.sendID == 0) {
-                  survey.surveyApprove.push(user._id);
-                } else if (obj.result.sendID == 1) {
-                  survey.surveyDeny.push(user._id);
-                } else if (obj.result.sendID == 2) {
-                  survey.surveyNotParicipate.push(user._id);
-                } else {
-                  answer = {
-                    type: "Result",
-                    result: "Error",
-                    error: "Invalid sendID",
-                  };
-                }
-              }
-              if (answer == null) {
-                survey.participants.push(user._id);
-                survey.save();
                 answer = {
-                  type: "Answer",
-                  result: "Voted Successful",
-                  event: survey,
+                  type: "Result",
+                  result: "Error",
+                  error: "Invalid sendID",
                 };
               }
+          } else {
+            if (obj.result.sendID == 0) {
+              survey.surveyApprove.push(user._id);
+            } else if (obj.result.sendID == 1) {
+              survey.surveyDeny.push(user._id);
+            } else if (obj.result.sendID == 2) {
+              survey.surveyNotParicipate.push(user._id);
+            } else {
+              answer = {
+                type: "Result",
+                result: "Error",
+                error: "Invalid sendID",
+              };
             }
           }
-        });
-      }
+          if (answer == null) {
+            survey.participants.push(user._id);
+            survey.save();
+            answer = {
+              type: "Answer",
+              result: "Voted Successful",
+              event: survey,
+            };
+          }
+        }
+        sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+        callRefresh();
+      });
     });
   } catch (e) {
     console.log(e);
@@ -645,9 +650,8 @@ async function voteForSurvey(obj, ws) {
       result: "Error",
       error: e,
     };
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   }
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
-  callRefresh();
 }
 
 async function getSessionFromID(obj, ws) {
@@ -675,7 +679,19 @@ async function getSurveyFromID(obj, ws) {
   console.log("Get survey from ID " + obj.result.surveyId);
   var answer;
   try {
-    await Surveys.findById(obj.result.surveyId).then((survey) => {
+    await Surveys.findById(obj.result.surveyId).populate({
+      path: "participants",
+      select: "username",
+    }).populate({
+      path: "surveyApprove",
+      select: "username",
+    }).populate({
+      path: "surveyDeny",
+      select: "username",
+    }).populate({
+      path: "surveyNotParicipate",
+      select: "username",
+    }).then((survey) => {
       if (survey) {
         answer = {
           type: "Answer",
@@ -701,14 +717,39 @@ async function getSurveyFromID(obj, ws) {
   sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
 
-async function callRefresh(){
+async function callRefresh() {
   console.log("Call refresh");
   var answer = {
     type: "Refresh",
-    }
-  for(var i = 0; i < CLIENTS.length; i++){
-    var ws = CLIENTS[i];
-      sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
-   }
   }
+  for (var i = 0; i < CLIENTS.length; i++) {
+    var ws = CLIENTS[i];
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  }
+}
 
+async function getAnonymousID() {
+  await User.findOne({
+    username: "Anonymous"
+  }).then((user) => {
+    if (user) {
+      anonym = user._id;
+    }
+    else {
+      return createAnonymousUser();
+    }
+  });
+}
+
+async function createAnonymousUser() {
+  console.log("Create anonymous user");
+  await User.create({
+    username: "Anonymous",
+    password: "Anonymous",
+    email: "anonymous@email",
+  }).then((user) => {
+    anonym = user._id;
+  }).catch((err) => {
+    console.log(err);
+  });
+}
