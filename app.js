@@ -7,11 +7,12 @@ dotenv.config();
 app.use(cors);
 
 const mongoose = require("mongoose");
+const { Console } = require("console");
 const { Schema } = mongoose;
+var CLIENTS = [];
 
 class SocketServer {
   constructor(server) {
-    var CLIENTS = [];
     var id = 0;
     this.listen = () => {
       SocketServer.websocket.on("connection", async (socket) => {
@@ -124,6 +125,7 @@ var EventType;
   EventType["IN_EVENT_MESSAGE"] = "message";
   EventType["IN_EVENT_REQUEST_QUE"] = "request_que";
   EventType["IN_EVENT_OFFLINE"] = "offline";
+  EventType["IN_EVENT_REFRESH"] = "refresh";
   // Out Events
   EventType["OUT_EVENT_ONLINE"] = "online";
   EventType["OUT_EVENT_MESSAGE"] = "message";
@@ -167,6 +169,7 @@ const surveySchema = new Schema({
   surveyDeny: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   surveyNotParicipate: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   anonymous: Boolean,
+  allowEnthaltung: Boolean,
   participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 });
 
@@ -233,7 +236,11 @@ async function useJSON(payload, ws) {
       getAllSessions(payload, ws);
       break;
     }
-    case "joinSession":{
+    case "getAllSessionsAndSurveys": {
+      getAllSessionsAndSurveys(payload, ws);
+      break;
+    }
+    case "joinSession": {
       joinSession(payload, ws);
       break;
     }
@@ -271,7 +278,7 @@ async function getAllSurveys(payload, ws) {
     answer = {
       type: "Result",
       result: "Surveys",
-      events: result,
+      surveys: result,
     };
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   }).catch((err) => {
@@ -294,7 +301,7 @@ async function getAllSurveysFromSession(payload, ws) {
     answer = {
       type: "Result",
       result: "Surveys",
-      events: result,
+      surveys: result,
     };
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   }).catch((err) => {
@@ -306,7 +313,32 @@ async function getAllSurveysFromSession(payload, ws) {
     }
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   });
+}
 
+async function getAllSessionsAndSurveys(payload, ws) {
+  console.log("Get all sessions and surveys");
+  var answer;
+  Session.find({
+  }).then((result) => {
+    Surveys.find({
+    }).then((surveys) => {
+      answer = {
+        type: "Result",
+        result: "Sessions",
+        sessions: result,
+        surveys: surveys,
+      };
+      sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    });
+  }).catch((err) => {
+    console.log(err);
+    answer = {
+      type: "Error",
+      result: "Error",
+      error: err,
+    }
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  });
 }
 
 async function getAllSessions(payload, ws) {
@@ -318,7 +350,7 @@ async function getAllSessions(payload, ws) {
     answer = {
       type: "Result",
       result: "Sessions",
-      events: result,
+      sessions: result,
     };
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   }).catch((err) => {
@@ -346,6 +378,7 @@ async function joinSession(payload, ws) {
       events: result,
     };
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    callRefresh();
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -437,7 +470,8 @@ async function startSession(obj, ws) {
       result: session._id,
     };
 
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    callRefresh();
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -445,8 +479,7 @@ async function startSession(obj, ws) {
       result: "Error",
       error: err,
     };
-
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   });
 }
 
@@ -502,7 +535,8 @@ async function createSurvey(obj, ws) {
           result: "Error",
           error: "User not found",
         };
-      sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+        sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+        callRefresh();
       }
     })
   } catch (e) {
@@ -512,16 +546,16 @@ async function createSurvey(obj, ws) {
       result: "Error",
       error: e,
     };
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   }
 }
 
-async function updateSession(obj, ws){
+async function updateSession(obj, ws) {
   console.log("Update session");
   var answer;
   try {
     var session = await Session.findById(obj.result.id);
-    if(session){
+    if (session) {
       session.name = obj.result.name;
       session.description = obj.result.description;
       await session.save();
@@ -613,6 +647,7 @@ async function voteForSurvey(obj, ws) {
     };
   }
   sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  callRefresh();
 }
 
 async function getSessionFromID(obj, ws) {
@@ -623,7 +658,7 @@ async function getSessionFromID(obj, ws) {
     answer = {
       type: "Answer",
       result: "Session",
-      event: session,
+      session: session,
     };
   } catch (e) {
     console.log(e);
@@ -645,7 +680,7 @@ async function getSurveyFromID(obj, ws) {
         answer = {
           type: "Answer",
           result: "Survey",
-          event: survey,
+          survey: survey,
         };
       } else {
         answer = {
@@ -665,4 +700,15 @@ async function getSurveyFromID(obj, ws) {
   }
   sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
 }
+
+async function callRefresh(){
+  console.log("Call refresh");
+  var answer = {
+    type: "Refresh",
+    }
+  for(var i = 0; i < CLIENTS.length; i++){
+    var ws = CLIENTS[i];
+      sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+   }
+  }
 
