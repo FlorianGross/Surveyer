@@ -144,7 +144,7 @@ const sessionSchema = new Schema({
     },
   ],
   surveys: [
-    { type: mongoose.Schema.Types.ObjectId, ref: "Survey", },
+    { type: mongoose.Schema.Types.ObjectId, ref: "Surveys", },
   ],
   name: {
     type: String,
@@ -174,7 +174,9 @@ const surveySchema = new Schema({
     ref: "Sessions",
     required: true,
   },
-  creator: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, },
+  creator: { 
+    type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, 
+  },
   surveyDescription: String,
   surveyOpened: Boolean,
   surveyName: {
@@ -245,6 +247,10 @@ async function useJSON(payload, ws) {
       getAllSurveysFromSession(payload, ws);
       break;
     }
+    case "getAllSessionsNames":{
+      getAllSessionsNames(payload, ws);
+      break;
+    }
     case "getAllSurveys": {
       getAllSurveys(payload, ws);
       break;
@@ -290,14 +296,21 @@ async function useJSON(payload, ws) {
 async function getAllSurveys(payload, ws) {
   console.log("Get all surveys");
   var answer;
+  Session.find({
+    participants: { $in: [payload.result.uid] },
+  }).then((sessions) => {
   Surveys.find({
-  }).then((result) => {
+    surveySession: { $in: sessions.map((session) => session._id) },
+  }).select(
+    "surveySession surveyDescription surveyOpened surveyName participants"
+  ).then((result) => {
     answer = {
       type: "Result",
       result: "Surveys",
       surveys: result,
     };
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  });
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -336,17 +349,16 @@ async function getAllSessionsAndSurveys(payload, ws) {
   console.log("Get all sessions and surveys");
   var answer;
   Session.find({
+    participants: { $in: [payload.result.uid] }
+  }).populate({
+    path: "surveys",
   }).then((result) => {
-    Surveys.find({
-    }).then((surveys) => {
       answer = {
         type: "Result",
         result: "Sessions",
         sessions: result,
-        surveys: surveys,
-      };
-      sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
-    });
+    }
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -364,6 +376,29 @@ async function getAllSessions(payload, ws) {
   Session.find({
     participants: { $in: [payload.result.uid] },
   }).then((result) => {
+    answer = {
+      type: "Result",
+      result: "Sessions",
+      sessions: result,
+    };
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  }).catch((err) => {
+    console.log(err);
+    answer = {
+      type: "Error",
+      result: "Error",
+      error: err,
+    }
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  });
+}
+
+async function getAllSessionsNames(payload, ws) {
+  console.log("Get all sessions names");
+  var answer;
+  Session.find({
+    participants: { $in: [payload.result.uid] },
+  }).select("name").then((result) => {
     answer = {
       type: "Result",
       result: "Sessions",
@@ -542,6 +577,14 @@ async function createSurvey(obj, ws) {
       result: survey._id,
     };
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    Session.findById(obj.result.surveySession).then((session) => {
+      session.surveys.push(survey._id);
+      session.save();
+    }
+    ).catch((err) => {
+      console.log(err);
+    }
+    );
     callRefresh();
   }
   ).catch((err) => {
@@ -593,7 +636,13 @@ async function voteForSurvey(obj, ws) {
   try {
     User.findById(obj.result.uid).then((user) => {
       Surveys.findById(obj.result.surveyID).then((survey) => {
-        if (survey.participants.includes(obj.result.uid)) {
+        if(!survey.surveyOpened){
+          answer = {
+            type: "Result",
+            result: "Error",
+            error: "Survey not opened",
+          };
+        }else if (survey.participants.includes(obj.result.uid)) {
           answer = {
             type: "Result",
             result: "Already voted",
@@ -632,15 +681,22 @@ async function voteForSurvey(obj, ws) {
           if (answer == null) {
             survey.participants.push(user._id);
             survey.save();
+            Session.findById(survey.surveySession).then((session) => {
+              console.log("survey participants lenght " + survey.participants.length);
+              console.log("session participants lenght " + session.participants.length);
+            if(survey.participants.length == session.participants.lenght){
+              console.log("Survey closed");
+            }
             answer = {
               type: "Answer",
               result: "Voted Successful",
               event: survey,
             };
+            sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+            callRefresh();
+          });
           }
         }
-        sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
-        callRefresh();
       });
     });
   } catch (e) {
@@ -658,7 +714,10 @@ async function getSessionFromID(obj, ws) {
   console.log("Get session from ID");
   var answer;
   try {
-    var session = await Session.findById(obj.result.sessionID);
+    var session = await Session.findById(obj.result.sessionID).populate({
+      path: "participants",
+      select: "username",
+    });
     answer = {
       type: "Answer",
       result: "Session",
