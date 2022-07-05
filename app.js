@@ -287,6 +287,10 @@ async function useJSON(payload, ws) {
       getSurveyFromID(payload, ws);
       break;
     }
+    case "leaveSession":{
+      leaveSession(payload, ws);
+      break;
+    }
     default:
       missingType(payload, ws);
       break;
@@ -301,9 +305,7 @@ async function getAllSurveys(payload, ws) {
   }).then((sessions) => {
   Surveys.find({
     surveySession: { $in: sessions.map((session) => session._id) },
-  }).select(
-    "surveySession surveyDescription surveyOpened surveyName participants"
-  ).then((result) => {
+  }).then((result) => {
     answer = {
       type: "Result",
       result: "Surveys",
@@ -332,6 +334,28 @@ async function getAllSurveysFromSession(payload, ws) {
       type: "Result",
       result: "Surveys",
       surveys: result,
+    };
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  }).catch((err) => {
+    console.log(err);
+    answer = {
+      type: "Error",
+      result: "Error",
+      error: err,
+    }
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  });
+}
+
+async function leaveSession(payload, ws){
+  console.log("Leave session");
+  var answer;
+  Session.findById(payload.result.sessionId).then((session) => {
+    session.participants.splice(session.participants.indexOf(payload.result.uid), 1);
+    session.save();
+    answer = {
+      type: "Answer",
+      result: "Leave successful",
     };
     sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
   }).catch((err) => {
