@@ -165,6 +165,11 @@ const userSchema = new Schema({
     type: String,
     required: true,
   },
+  shownName: {
+    type: String,
+    required: true,
+  },
+  anonymous: Boolean,
   password: String,
 });
 
@@ -513,6 +518,8 @@ async function registerUser(obj, ws) {
       username: obj.result.userName,
       email: obj.result.email,
       password: obj.result.password,
+      shownName: obj.result.shownName,
+      anonymous: obj.result.anonymous,
     });
     answer = {
       type: "Result",
@@ -764,16 +771,16 @@ async function getSurveyFromID(obj, ws) {
   try {
     await Surveys.findById(obj.result.surveyId).populate({
       path: "participants",
-      select: "username",
+      select: "username shownName",
     }).populate({
       path: "surveyApprove",
-      select: "username",
+      select: "username shownName",
     }).populate({
       path: "surveyDeny",
-      select: "username",
+      select: "username shownName",
     }).populate({
       path: "surveyNotParicipate",
-      select: "username",
+      select: "username shownName",
     }).then((survey) => {
       if (survey) {
         answer = {
@@ -830,6 +837,8 @@ async function createAnonymousUser() {
     username: "Anonymous",
     password: "Anonymous",
     email: "anonymous@email",
+    shownName: "Anonymous",
+    anonymous: true,
   }).then((user) => {
     anonym = user._id;
   }).catch((err) => {
