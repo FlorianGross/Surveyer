@@ -3,6 +3,7 @@ const app = express();
 const WebSocket = require("ws");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const bcrypt = require("bcryptjs");
 dotenv.config();
 app.use(cors);
 
@@ -477,7 +478,7 @@ async function loginUser(obj, ws) {
   try {
     await User.findOne({ username: obj.result.userName }).then
       ((user) => {
-        if (user.password === obj.result.password) {
+        if (bcrypt.compareSync(obj.result.password, user.password)) {
           answer = {
             type: "Result",
             result: "Success",
@@ -514,10 +515,15 @@ async function registerUser(obj, ws) {
   console.log("Registering user");
   var answer;
   try {
+    if(obj.result.anonymous == true){
+      obj.result.userName = Math.random().toString(36).substring(2, 15);
+      obj.result.password = Math.random().toString(36).substring(2, 15);
+      obj.result.email = Math.random().toString(36).substring(2, 15)+"@mail.de";
+    }
     var user = await User.create({
       username: obj.result.userName,
       email: obj.result.email,
-      password: obj.result.password,
+      password: bcrypt.hashSync(obj.result.password, 10),
       shownName: obj.result.shownName,
       anonymous: obj.result.anonymous,
     });
@@ -836,7 +842,7 @@ async function createAnonymousUser() {
   await User.create({
     username: "Anonymous",
     password: "Anonymous",
-    email: "anonymous@email",
+    email: "anonymous@email.de",
     shownName: "Anonymous",
     anonymous: true,
   }).then((user) => {
