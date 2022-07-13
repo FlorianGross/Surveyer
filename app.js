@@ -77,7 +77,8 @@ handleMessage = (socket, eventModel) => {
       sendEvent(socket, createWelcomeEventModel());
       break;
     case EventType.IN_EVENT_MESSAGE:
-      useJSON(eventModel.payload, socket);
+      console.log("Message from: "+eventModel.location);
+      useJSON(eventModel.payload, socket, eventModel.location);
       break;
   }
 };
@@ -85,14 +86,15 @@ handleMessage = (socket, eventModel) => {
 createWelcomeEventModel = () => {
   return new EventModel().createFromEvent(
     EventType.OUT_EVENT_ONLINE,
-    `Welcome`
+    `Welcome`,
+    null,
   );
 };
 
 sendEvent = (socket, eventModel) => {
-  console.log("Send Event:" + JSON.stringify({ event: eventModel.eventType, payload: eventModel.payload }));
+  console.log("Send Event:" + JSON.stringify({ event: eventModel.eventType , location: eventModel.location})+"\n");
   socket.send(
-    JSON.stringify({ event: eventModel.eventType, payload: eventModel.payload })
+    JSON.stringify({ event: eventModel.eventType, payload: eventModel.payload, location: eventModel.location})
   );
 };
 
@@ -102,9 +104,10 @@ closeConnection = async (message) => {
 
 class EventModel {
   constructor() {
-    this.createFromEvent = (eventType, payload) => {
+    this.createFromEvent = (eventType, payload, location) => {
       this.eventType = eventType;
       this.payload = payload;
+      this.location = location;
       return this;
     };
     this.createFromAny = (data) => {
@@ -113,6 +116,7 @@ class EventModel {
         if (!object.hasOwnProperty("event")) return;
         this.eventType = object.event;
         this.payload = object.payload;
+        this.location = object.location;
       } catch (e) {
         console.error("Json parse error: ", e);
       }
@@ -150,7 +154,6 @@ const sessionSchema = new Schema({
   name: {
     type: String,
     required: true,
-    unique: true,
   },
   description: String,
   isActive: Boolean,
@@ -234,76 +237,76 @@ server.listen(process.env.PORT || 3000, () => {
   getAnonymousID();
 });
 
-async function useJSON(payload, ws) {
+async function useJSON(payload, ws, location) {
   console.log("Use JSON:" + JSON.stringify(payload));
   switch (payload.type) {
     case "loginUser": {
-      loginUser(payload, ws);
+      loginUser(payload, ws, location);
       break;
     }
     case "registerUser": {
-      registerUser(payload, ws);
+      registerUser(payload, ws, location);
       break;
     }
     case "createSession": {
-      startSession(payload, ws);
+      startSession(payload, ws, location);
       break;
     }
     case "getAllSurveysFromSession": {
-      getAllSurveysFromSession(payload, ws);
+      getAllSurveysFromSession(payload, ws, location);
       break;
     }
     case "getAllSessionsNames":{
-      getAllSessionsNames(payload, ws);
+      getAllSessionsNames(payload, ws, location);
       break;
     }
     case "getAllSurveys": {
-      getAllSurveys(payload, ws);
+      getAllSurveys(payload, ws, location);
       break;
     }
     case "getAllSessions": {
-      getAllSessions(payload, ws);
+      getAllSessions(payload, ws, location);
       break;
     }
     case "getAllSessionsAndSurveys": {
-      getAllSessionsAndSurveys(payload, ws);
+      getAllSessionsAndSurveys(payload, ws, location);
       break;
     }
     case "joinSession": {
-      joinSession(payload, ws);
+      joinSession(payload, ws, location);
       break;
     }
     case "getSessionFromID": {
-      getSessionFromID(payload, ws);
+      getSessionFromID(payload, ws, location);
       break;
     }
     case "voteForSurvey": {
-      voteForSurvey(payload, ws);
+      voteForSurvey(payload, ws, location);
       break;
     }
     case "updateSession": {
-      updateSession(payload, ws);
+      updateSession(payload, ws, location);
       break;
     }
     case "createSurvey": {
-      createSurvey(payload, ws);
+      createSurvey(payload, ws, location);
       break;
     }
     case "getSurveyFromID": {
-      getSurveyFromID(payload, ws);
+      getSurveyFromID(payload, ws, location);
       break;
     }
     case "leaveSession":{
-      leaveSession(payload, ws);
+      leaveSession(payload, ws, location);
       break;
     }
     default:
-      missingType(payload, ws);
+      missingType(payload, ws, location);
       break;
   }
 }
 
-async function getAllSurveys(payload, ws) {
+async function getAllSurveys(payload, ws, location) {
   console.log("Get all surveys");
   var answer;
   Session.find({
@@ -317,7 +320,7 @@ async function getAllSurveys(payload, ws) {
       result: "Surveys",
       surveys: result,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   });
   }).catch((err) => {
     console.log(err);
@@ -326,11 +329,11 @@ async function getAllSurveys(payload, ws) {
       result: "Error",
       error: err,
     }
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   });
 }
 
-async function getAllSurveysFromSession(payload, ws) {
+async function getAllSurveysFromSession(payload, ws, location) {
   console.log("Get all surveys from session");
   var answer;
   Surveys.find({
@@ -341,7 +344,7 @@ async function getAllSurveysFromSession(payload, ws) {
       result: "Surveys",
       surveys: result,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -349,11 +352,11 @@ async function getAllSurveysFromSession(payload, ws) {
       result: "Error",
       error: err,
     }
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   });
 }
 
-async function leaveSession(payload, ws){
+async function leaveSession(payload, ws, location){
   console.log("Leave session");
   var answer;
   Session.findById(payload.result.sessionId).then((session) => {
@@ -363,7 +366,7 @@ async function leaveSession(payload, ws){
       type: "Answer",
       result: "Leave successful",
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -371,24 +374,27 @@ async function leaveSession(payload, ws){
       result: "Error",
       error: err,
     }
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   });
 }
 
-async function getAllSessionsAndSurveys(payload, ws) {
+async function getAllSessionsAndSurveys(payload, ws, location) {
   console.log("Get all sessions and surveys");
   var answer;
   Session.find({
     participants: { $in: [payload.result.uid] }
   }).populate({
     path: "surveys",
+  }).populate({
+    path: "participants",
+    select: "name shownName",
   }).then((result) => {
       answer = {
         type: "Result",
         result: "Sessions",
         sessions: result,
     }
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -396,11 +402,11 @@ async function getAllSessionsAndSurveys(payload, ws) {
       result: "Error",
       error: err,
     }
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   });
 }
 
-async function getAllSessions(payload, ws) {
+async function getAllSessions(payload, ws, location) {
   console.log("Get all sessions");
   var answer;
   Session.find({
@@ -411,7 +417,7 @@ async function getAllSessions(payload, ws) {
       result: "Sessions",
       sessions: result,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -419,11 +425,11 @@ async function getAllSessions(payload, ws) {
       result: "Error",
       error: err,
     }
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   });
 }
 
-async function getAllSessionsNames(payload, ws) {
+async function getAllSessionsNames(payload, ws, location) {
   console.log("Get all sessions names");
   var answer;
   Session.find({
@@ -434,7 +440,7 @@ async function getAllSessionsNames(payload, ws) {
       result: "Sessions",
       sessions: result,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   }).catch((err) => {
     console.log(err);
     answer = {
@@ -442,11 +448,11 @@ async function getAllSessionsNames(payload, ws) {
       result: "Error",
       error: err,
     }
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   });
 }
 
-async function joinSession(payload, ws) {
+async function joinSession(payload, ws, location) {
   console.log("Join session");
   var answer;
   Session.findOneAndUpdate({
@@ -457,9 +463,9 @@ async function joinSession(payload, ws) {
     answer = {
       type: "Result",
       result: "Session",
-      events: result,
+      session: result,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
     callRefresh();
   }).catch((err) => {
     console.log(err);
@@ -468,11 +474,11 @@ async function joinSession(payload, ws) {
       result: "Error",
       error: err,
     }
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   });
 }
 
-async function loginUser(obj, ws) {
+async function loginUser(obj, ws, location) {
   console.log("Login User");
   var answer;
   try {
@@ -498,20 +504,20 @@ async function loginUser(obj, ws) {
       result: "Unsuccessful",
     };
   }
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
 }
 
-async function missingType(obj, ws) {
+async function missingType(obj, ws, location) {
   console.log("Missing type");
   var answer = {
     type: "Result",
     result: "Error",
     error: obj,
   };
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
 }
 
-async function registerUser(obj, ws) {
+async function registerUser(obj, ws, location) {
   console.log("Registering user");
   var answer;
   try {
@@ -540,10 +546,10 @@ async function registerUser(obj, ws) {
       error: e,
     };
   }
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
 }
 
-async function startSession(obj, ws) {
+async function startSession(obj, ws, location) {
   console.log("Start session");
   var answer;
   Session.create({
@@ -558,7 +564,7 @@ async function startSession(obj, ws) {
       type: "Answer",
       result: session._id,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
     callRefresh();
   }).catch((err) => {
     console.log(err);
@@ -567,11 +573,11 @@ async function startSession(obj, ws) {
       result: "Error",
       error: err,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   });
 }
 
-async function stopSession(obj, ws) {
+async function stopSession(obj, ws, location) {
   try {
     currentSession = await Session.findById(obj.sessionId);
     currentSession.isActive = false;
@@ -588,10 +594,10 @@ async function stopSession(obj, ws) {
       error: e,
     };
   }
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
 }
 
-async function createSurvey(obj, ws) {
+async function createSurvey(obj, ws, location) {
   console.log("Create survey");
   var answer;
   var surveyVals = {
@@ -613,7 +619,7 @@ async function createSurvey(obj, ws) {
       type: "Answer",
       result: survey._id,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
     Session.findById(obj.result.surveySession).then((session) => {
       session.surveys.push(survey._id);
       session.save();
@@ -631,12 +637,12 @@ async function createSurvey(obj, ws) {
       result: "Error",
       error: err,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   }
   );
 }
 
-async function updateSession(obj, ws) {
+async function updateSession(obj, ws, location) {
   console.log("Update session");
   var answer;
   try {
@@ -664,10 +670,10 @@ async function updateSession(obj, ws) {
       error: e,
     };
   }
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
 }
 
-async function voteForSurvey(obj, ws) {
+async function voteForSurvey(obj, ws, location) {
   console.log("Vote for survey");
   var answer;
   try {
@@ -729,7 +735,7 @@ async function voteForSurvey(obj, ws) {
               result: "Voted Successful",
               event: survey,
             };
-            sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+            sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
             callRefresh();
           });
           }
@@ -743,17 +749,17 @@ async function voteForSurvey(obj, ws) {
       result: "Error",
       error: e,
     };
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
   }
 }
 
-async function getSessionFromID(obj, ws) {
+async function getSessionFromID(obj, ws, location) {
   console.log("Get session from ID");
   var answer;
   try {
     var session = await Session.findById(obj.result.sessionID).populate({
       path: "participants",
-      select: "username",
+      select: "username shownName",
     });
     answer = {
       type: "Answer",
@@ -768,10 +774,10 @@ async function getSessionFromID(obj, ws) {
       error: e,
     };
   }
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
 }
 
-async function getSurveyFromID(obj, ws) {
+async function getSurveyFromID(obj, ws, location) {
   console.log("Get survey from ID " + obj.result.surveyId);
   var answer;
   try {
@@ -810,7 +816,7 @@ async function getSurveyFromID(obj, ws) {
       error: e,
     };
   }
-  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+  sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, location));
 }
 
 async function callRefresh() {
@@ -820,7 +826,7 @@ async function callRefresh() {
   }
   for (var i = 0; i < CLIENTS.length; i++) {
     var ws = CLIENTS[i];
-    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer));
+    sendEvent(ws, new EventModel().createFromEvent(EventType.OUT_EVENT_MESSAGE, answer, null));
   }
 }
 
