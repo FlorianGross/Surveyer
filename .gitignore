@@ -18,6 +18,7 @@ lib
 dist
 tsconfig.tsbuildinfo
 
+.env
 # Visual Studio Code configs
 .vscode/
 
